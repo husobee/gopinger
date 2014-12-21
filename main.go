@@ -34,4 +34,11 @@ func main() {
 		panic(err.Error())
 	}
 
+	timestamppacket := icmp.NewTimeStampRequestMessage(sendid, sendseq, 0, 0, 0)
+	fmt.Printf("checksum: %x\n", timestamppacket.Header.Header.Checksum)
+	_, err = ipconn.Write(timestamppacket.Bytes())
+	if err != nil {
+		panic(err.Error())
+	}
+
 }

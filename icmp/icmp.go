@@ -1,22 +1,29 @@
 package icmp
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
-	"os"
 )
 
+//ICMP types
 const (
-	// EchoRequestType is 8
-	EchoRequestType = byte(8)
-	//EchoRequestCode is 0
-	EchoRequestCode = byte(0)
-	// EchoResponseType is 0
-	EchoResponseType = byte(0)
-	//EchoResponseCode is 0
-	EchoResponseCode = byte(0)
+	EchoReply              = uint16(0 << 8)
+	DestinationUnreachable = uint16(3 << 8)
+	SourceQuench           = uint16(4 << 8)
+	RedirectMessage        = uint16(5 << 8)
+	EchoRequest            = uint16(8 << 8)
+	RouterAdvertisement    = uint16(9 << 8)
+	RouterSolicitation     = uint16(10 << 8)
+	TimeExceeded           = uint16(11 << 8)
+	ParameterProblem       = uint16(12 << 8)
+	TimeStamp              = uint16(13 << 8)
+	TimeStampReply         = uint16(14 << 8)
+	InformationRequest     = uint16(15 << 8)
+	InformationReply       = uint16(16 << 8)
+	AddressMaskRequest     = uint16(17 << 8)
+	AddressMaskReply       = uint16(18 << 8)
+	Traceroute             = uint16(30 << 8)
 )
 
 // calculateChecksum - perform the checksum calculation of the icmp message
@@ -46,142 +53,25 @@ func calculateChecksum(im IcmpMessage) uint16 {
 	return uint16(uint16(hi)<<8 + uint16(lo))
 }
 
-// Echo Header (echo request/response header)
-type EchoHeader struct {
-	Header   IcmpHeader
-	Id       uint16
-	Sequence uint16
-}
-
-//Write - write the EchoHeader
-func (eh *EchoHeader) Write(w io.Writer) error {
-	// write the icmp header
-	err := eh.Header.Write(w)
-	if err != nil {
-		return errors.New("failed to write icmp header")
-	}
-	// write the echo ident
-	err = binary.Write(w, binary.BigEndian, eh.Id)
-	if err != nil {
-		return errors.New("failed to write echo request/response ident")
-	}
-	// write the echo sequence
-	err = binary.Write(w, binary.BigEndian, eh.Sequence)
-	if err != nil {
-		return errors.New("failed to write echo request/response seq")
-	}
-	return nil
-}
-
-// NewEchoHeader - Create a new echo header, specify the type/code/id/seq
-func NewEchoHeader(t, c byte, id, seq uint16) EchoHeader {
-	icmpHeader := NewIcmpHeader(t, c, 0)
-	return EchoHeader{
-		Header:   icmpHeader,
-		Id:       id,
-		Sequence: seq,
-	}
-}
-
-// EchoMessage - Base type for echo request/reply
-type EchoMessage struct {
-	Header  EchoHeader
-	Payload []byte
-}
-
-//Write - write the EchoMessage to an io.writer
-func (em *EchoMessage) Write(w io.Writer) error {
-	// write the echoheader
-	err := em.Header.Write(w)
-	if err != nil {
-		return errors.New("failed to write echo header")
-	}
-	// write the payload
-	err = binary.Write(w, binary.BigEndian, em.Payload)
-	if err != nil {
-		return errors.New("failed to write echo payload")
-	}
-	return nil
-}
-
-//CalculateChecksum - wrapper around calculateChecksum, sets the checksum
-func (em *EchoMessage) CalculateChecksum() {
-	em.Header.Header.Checksum = calculateChecksum(em)
-}
-
-// Bytes - Get the byte repr of the echo message
-func (em *EchoMessage) Bytes() []byte {
-	var buffer = new(bytes.Buffer)
-	em.Write(buffer)
-	return buffer.Bytes()
-}
-
-// Bytes - Get the byte repr of the echo message
-func (em *EchoMessage) StdOut() {
-	em.Write(os.Stdout)
-}
-
-// EchoRequestMessage - wraps the EchoMessage, type 8, code 0
-type EchoRequestMessage struct {
-	*EchoMessage
-}
-
-// NewEchoRequestMessage - create a new echo request message
-func NewEchoRequestMessage(id, seq uint16, payload []byte) EchoRequestMessage {
-	request := EchoRequestMessage{
-		&EchoMessage{
-			Header:  NewEchoHeader(EchoRequestType, EchoRequestCode, id, seq),
-			Payload: payload,
-		},
-	}
-	// calculate the checksum of the message before returning
-	request.CalculateChecksum()
-	return request
-}
-
-// EchoResponseMessage - wraps the EchoMessage
-type EchoResponseMessage struct {
-	*EchoMessage
-}
-
-// NewEchoResponseMessage - setup an echo response message
-func NewEchoResponseMessage(id, seq uint16, payload []byte) EchoResponseMessage {
-	response := EchoResponseMessage{
-		&EchoMessage{
-			Header:  NewEchoHeader(EchoResponseType, EchoResponseCode, id, seq),
-			Payload: payload,
-		},
-	}
-	// calculate checksum
-	response.CalculateChecksum()
-	return response
-}
-
 // IcmpHeader - Fields of the ICMP header
 type IcmpHeader struct {
-	Type     byte
-	Code     byte
+	TypeCode uint16
 	Checksum uint16
 }
 
 // NewIcmpHeader - create a new icmp header
-func NewIcmpHeader(t, c byte, cs uint16) IcmpHeader {
+func NewIcmpHeader(tc uint16, cs uint16) IcmpHeader {
 	return IcmpHeader{
-		Type:     t,
-		Code:     c,
+		TypeCode: tc,
 		Checksum: cs,
 	}
 }
 
 //Write - write the EchoRequestHeader
 func (ih *IcmpHeader) Write(w io.Writer) error {
-	err := binary.Write(w, binary.BigEndian, ih.Type)
+	err := binary.Write(w, binary.BigEndian, ih.TypeCode)
 	if err != nil {
-		return errors.New("failed to write icmp type")
-	}
-	err = binary.Write(w, binary.BigEndian, ih.Code)
-	if err != nil {
-		return errors.New("failed to write icmp code")
+		return errors.New("failed to write icmp type/code")
 	}
 	err = binary.Write(w, binary.BigEndian, ih.Checksum)
 	if err != nil {
